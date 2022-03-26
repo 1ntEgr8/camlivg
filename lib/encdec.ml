@@ -44,7 +44,7 @@ module Decoder = struct
       else buf
 
     let num_encoding_type b =
-      let type_spec = b land 0b11 in
+      let type_spec = b land 0x3 in
       if type_spec = 0 then 4 else if type_spec = 2 then 2 else 1
 
     let decode_float hdl =
@@ -146,6 +146,59 @@ module Decoder = struct
       let c6, _, r6 = decode_coord hdl in
       ((c1, c2, c3, c4, c5, c6), r1 @ r2 @ r3 @ r4 @ r5 @ r6)
 
+    let decode_extra_data hdl =
+      let (ed_length, _, raw_ed_length) = decode_nat hdl in
+      let ed_bytes = read_n_bytes hdl ed_length in
+      ( (ed_length, ed_bytes)
+      , raw_ed_length @ [int_list_of_bytes ed_bytes])
+      
+    let decode_segref hdl =
+      let buf = read_eight_bytes hdl in
+      let is_inline = Int32.equal (Bytes.get_int32_le buf 32) Int32.zero in
+      let decode_inline_segref () =
+        let segment_type = Bytes.get_uint8 buf 0 in
+        let segment_length = 
+          let sub = Bytes.sub buf 1 3 in
+          let ext = Bytes.extend sub 0 5 in 
+          Bytes.fill ext 3 5 '\x00';
+          Bytes.get_int64_le ext 0
+        in
+        let segment_offset = Int64.of_int (Input.pos hdl) in
+        SegrefInline (segment_type, segment_length, segment_offset)
+      in
+      let decode_absolute_segref () =
+        let is_direct = ((int_of_char (Bytes.get buf 7)) land 0x1) = 0 in
+        if is_direct then
+          let segment_type = Bytes.get_uint8 buf 0 in
+          let segment_length =
+            let sub = Bytes.sub buf 1 3 in
+            let ext = Bytes.extend sub 0 5 in
+            Bytes.fill ext 3 5 '\x00';
+            Bytes.get_int64_le ext 0
+          in
+          let segment_offset =
+            let sub = Bytes.sub buf 4 4 in
+            Int64.of_int32 (Bytes.get_int32_le sub 0)
+          in
+          SegrefAbsoluteDirect (segment_type, segment_length, segment_offset)
+        else
+          let segment_type = Bytes.get_uint8 buf 0 in
+          let indirect_offset =
+            let sub = Bytes.sub buf 1 7 in
+            let ext = Bytes.extend sub 0 1 in
+            Bytes.fill ext 7 1 '\x00';
+            Bytes.get_int64_le ext 0
+          in
+          SegrefAbsoluteIndirect (segment_type, indirect_offset)
+      in
+      let segref = 
+        if is_inline then
+          decode_inline_segref ()
+        else
+          decode_absolute_segref ()
+      in
+      (segref, [int_list_of_bytes buf])
+
     let decode_instruction hdl =
       let opcode =
         try Input.read_byte hdl with End_of_file -> raise OutOfOps
@@ -203,16 +256,34 @@ module Decoder = struct
           ( LODJump (jump_count, lod0, lod1)
           , ([opcode] :: rjump_count) @ rlod0 @ rlod1 )
         else if opcode == 0x3B then (Return, [[opcode]])
-        else if opcode == 0x3C then failwith "not implemented"
-        else if opcode == 0x3D then failwith "not implemented"
+        else if opcode == 0x3C then
+          let (segref, raw_segref) = decode_segref hdl in
+          ( CallUntransformed segref
+          , ([opcode] :: raw_segref))
+        else if opcode == 0x3D then
+          let alpha_value = Input.read_byte hdl in
+          let (matrix, raw_matrix) = decode_sextuple hdl in
+          let (segref, raw_segref) = decode_segref hdl in
+          ( CallTransformed (alpha_value, matrix, segref)
+          , ([opcode] :: [alpha_value] :: raw_matrix @ raw_segref))
         else if opcode >= 0x3E && opcode <= 0x3F then
-          failwith "not implemented"
-          (*
-          let (ed_length, _) = decode_nat hdl in
-          let buf = Bytes.create ed_length in
-          Input.read_bytes hdl buf 0 ed_length;
-          Reserved buf
-          *)
+          let (extra_data, raw_extra_data) = decode_extra_data hdl in
+          ( Reserved0 extra_data
+          , ([opcode] :: raw_extra_data))
+        else if opcode >= 0xB0 && opcode <= 0xBF then
+          let (extra_data, raw_extra_data) = decode_extra_data hdl in
+          ( Reserved1 extra_data
+          , ([opcode] :: raw_extra_data))
+        else if opcode >= 0xC0 && opcode <= 0xDF then
+          let (extra_data, raw_extra_data) = decode_extra_data hdl in
+          let c1, _, r1 = decode_coord hdl in
+          let c2, _, r2 = decode_coord hdl in
+          ( Reserved2 (extra_data, (c1, c2))
+          , ([opcode] :: raw_extra_data @ r1 @ r2))
+        else if opcode >= 0xE0 && opcode <= 0xFF then
+          let (extra_data, raw_extra_data) = decode_extra_data hdl in
+          ( Reserved3 extra_data
+          , ([opcode] :: raw_extra_data))
         else if opcode >= 0x40 && opcode <= 0x4F then
           let buf = read_four_bytes hdl in
           ( SetRegLow (low4, Bytes.get_int32_le buf 0)

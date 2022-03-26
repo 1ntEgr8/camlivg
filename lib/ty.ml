@@ -2,6 +2,16 @@ open Util
 
 type raw_decoded_bytes = int list list
 
+type extra_data = int * bytes
+
+type segref =
+  (* SegrefInline (type, length, offset) *)
+  | SegrefInline of (int * int64 * int64)
+  (* SegrefAbsoluteDirect (type, length, offset) *)
+  | SegrefAbsoluteDirect of (int * int64 * int64)
+  (* SegrefAbsoluteIndirect (type, indirect_offset) *)
+  | SegrefAbsoluteIndirect of (int * int64)
+
 type instruction =
   | LineTo of tuple list
   | QuadTo of quadruple list
@@ -13,7 +23,9 @@ type instruction =
   | Jump of int
   | FDJump of int * int
   | LODJump of int * float * float
-  | CallUntransformed of int * sextuple
+  (* CallTransformed (alpha_value, affine_matrix, segref) *)
+  | CallTransformed of int * sextuple * segref
+  | CallUntransformed of segref
   | Return
   (* SetRegLow (low4, data) *)
   | SetRegLow of int * int32
@@ -29,10 +41,11 @@ type instruction =
   | FillLinearGradient of int * int * int * triple
   (* FillRadientGradient (low4, nstops, spread, coords) *)
   | FillRadialGradient of int * int * int * sextuple
-  | Reserved of bytes
+  | Reserved0 of extra_data
+  | Reserved1 of extra_data
+  | Reserved2 of extra_data * tuple
+  | Reserved3 of extra_data
   | Nop
-
-type segref = Inline | AbsoluteDirect | AbsoluteIndirect
 
 type msd = ViewBox of float * float * float * float
 
