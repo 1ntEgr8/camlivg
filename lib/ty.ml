@@ -18,6 +18,7 @@ type instruction =
   | CubeTo of sextuple list
   | ClosePathMoveTo of tuple
   | Parallelogram of quadruple
+  (* Ellipse (num_quarters, quad) *)
   | Ellipse of int * quadruple
   | SelPlus of int
   | Jump of int

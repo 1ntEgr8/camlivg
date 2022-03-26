@@ -17,6 +17,8 @@ module type V = sig
   val jump_to : t -> int -> unit
 
   val next_instruction : t -> instruction * raw_decoded_bytes
+
+  val reset : t vm -> unit
 end
 
 module Make (Decoder : Encdec.Decoder.D) : V with type t = Decoder.t = struct
@@ -30,4 +32,6 @@ module Make (Decoder : Encdec.Decoder.D) : V with type t = Decoder.t = struct
   let jump_to hdl offset = Decoder.seek hdl offset
 
   let next_instruction hdl = Decoder.decode_instruction hdl
+
+  let reset vm = Decoder.seek vm.pc vm.start_address
 end

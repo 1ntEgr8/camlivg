@@ -254,5 +254,9 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
       done
     with Encdec.Decoder.OutOfOps -> ()
 
-  let run vm = print_magic vm ; print_metadata vm ; print_instructions vm
+  let run vm =
+    Vm.reset vm;
+    print_magic vm ;
+    print_metadata vm ;
+    print_instructions vm
 end

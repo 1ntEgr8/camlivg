@@ -1,2 +1,3 @@
 (library
- (name camlivg))
+ (name camlivg)
+ (libraries cairo2))

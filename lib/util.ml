@@ -21,3 +21,17 @@ type triple = float * float * float
 type quadruple = float * float * float * float
 
 type sextuple = float * float * float * float * float * float
+
+module Point = struct
+  let (+~) (a1, a2) (b1, b2) =
+    (a1 +. b1, a2 +. b2)
+
+  let (-~) (a1, a2) (b1, b2) =
+    (a1 -. b1, a2 -. b2)
+
+  let ( *~ ) (a1, a2) n =
+    (a1 *. n, a2 *. n)
+
+  let (/~) (a1, a2) n =
+    (a1 /. n, a2 /. n)
+end
