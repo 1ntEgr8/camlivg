@@ -47,7 +47,7 @@ module Decoder = struct
       let type_spec = b land 0x3 in
       if type_spec = 0 then 4 else if type_spec = 2 then 2 else 1
 
-    let decode_float hdl =
+    let _decode_float hdl =
       let n0 = Input.read_byte hdl in
       let n1 = Input.read_byte hdl in
       let n2 = Input.read_byte hdl in
@@ -251,8 +251,8 @@ module Decoder = struct
           , ([opcode] :: rjump_count) @ rfeatures_needed )
         else if opcode == 0x3A then
           let jump_count, _, rjump_count = decode_nat hdl in
-          let lod0, rlod0 = decode_float hdl in
-          let lod1, rlod1 = decode_float hdl in
+          let lod0, _, rlod0 = decode_coord hdl in
+          let lod1, _, rlod1 = decode_coord hdl in
           ( LODJump (jump_count, lod0, lod1)
           , ([opcode] :: rjump_count) @ rlod0 @ rlod1 )
         else if opcode == 0x3B then (Return, [[opcode]])

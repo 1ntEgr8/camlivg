@@ -192,11 +192,11 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
               print_indent indent_level_2;
               printf "Target: #%04d (PC+%d)\n" (!idx + i + 1) i
           | FDJump (i, features_needed) ->
-              printf "Jump Feature Detection\n";
+              printf "Jump Feature-Bits\n";
               print_next_decoded raw_stream;
               print_indent indent_level_2;
               printf "Target: #%04d (PC+%d)\n" (!idx + i + 1) i;
-              printf "Features needed = %d\n" features_needed
+              printf "Features-Bits: %d\n" features_needed
           | LODJump (i, a, b) ->
               printf "Jump Level-of-Detail\n";
               print_next_decoded raw_stream;
