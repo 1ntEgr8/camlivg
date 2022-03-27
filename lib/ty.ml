@@ -40,7 +40,7 @@ type instruction =
   | FillFlat of int
   (* FillLinearGradient (low4, nstops, spread, coords) *)
   | FillLinearGradient of int * int * int * triple
-  (* FillRadientGradient (low4, nstops, spread, coords) *)
+  (* FillRadialGradient (low4, nstops, spread, coords) *)
   | FillRadialGradient of int * int * int * sextuple
   | Reserved0 of extra_data
   | Reserved1 of extra_data

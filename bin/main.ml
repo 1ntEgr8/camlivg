@@ -6,9 +6,8 @@ module IvgDisassembler = Disassembler.Make (IvgVm)
 module IvgCairoRenderer = Cairo_renderer.Make (IvgVm)
 
 let () =
-  let hdl = open_in_bin "test/data/action-info.iconvg" in
+  let hdl = open_in_bin "test/data/video-005.primitive.iconvg" in
   try
     let vm = IvgVm.init hdl in
-    IvgDisassembler.run vm;
-    IvgCairoRenderer.run vm
+    IvgDisassembler.run vm ; IvgCairoRenderer.run vm
   with Decoder.Invalid_Magic_Identifier -> printf "bad magic"

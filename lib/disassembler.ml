@@ -186,23 +186,23 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
               printf "Ellipse (%d quarters)\n" x ;
               print_quadruple raw_stream quad
           | SelPlus incr -> printf "SEL += %d\n" incr
-          | Jump i -> 
-              printf "Jump\n";
-              print_next_decoded raw_stream;
-              print_indent indent_level_2;
+          | Jump i ->
+              printf "Jump\n" ;
+              print_next_decoded raw_stream ;
+              print_indent indent_level_2 ;
               printf "Target: #%04d (PC+%d)\n" (!idx + i + 1) i
           | FDJump (i, features_needed) ->
-              printf "Jump Feature-Bits\n";
-              print_next_decoded raw_stream;
-              print_indent indent_level_2;
-              printf "Target: #%04d (PC+%d)\n" (!idx + i + 1) i;
+              printf "Jump Feature-Bits\n" ;
+              print_next_decoded raw_stream ;
+              print_indent indent_level_2 ;
+              printf "Target: #%04d (PC+%d)\n" (!idx + i + 1) i ;
               printf "Features-Bits: %d\n" features_needed
           | LODJump (i, a, b) ->
-              printf "Jump Level-of-Detail\n";
-              print_next_decoded raw_stream;
-              print_indent indent_level_2;
-              printf "Target: #%04d (PC+%d)\n" (!idx + i + 1) i;
-              print_float raw_stream a;
+              printf "Jump Level-of-Detail\n" ;
+              print_next_decoded raw_stream ;
+              print_indent indent_level_2 ;
+              printf "Target: #%04d (PC+%d)\n" (!idx + i + 1) i ;
+              print_float raw_stream a ;
               print_float raw_stream b
           | Return -> printf "Return\n"
           | SetRegHigh (low4, buf) ->
@@ -255,8 +255,5 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
     with Encdec.Decoder.OutOfOps -> ()
 
   let run vm =
-    Vm.reset vm;
-    print_magic vm ;
-    print_metadata vm ;
-    print_instructions vm
+    Vm.reset vm ; print_magic vm ; print_metadata vm ; print_instructions vm
 end
