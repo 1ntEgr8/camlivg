@@ -149,5 +149,4 @@ let postmul_rgba n =
   if Float.equal a 0. then (0., 0., 0., 0.)
   else (r /. a, g /. a, b /. a, a /. 255.)
 
-let transparent_black =
-  (0., 0., 0., 0.)
+let transparent_black = (0., 0., 0., 0.)

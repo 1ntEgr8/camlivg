@@ -17,7 +17,7 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
     ; eob: int64 }
 
   let init_machine () =
-    { regs= Array.make 64 0x0000_00FF_0000_0000L
+    { regs= Array.make 64 0xFF00_0000_0000_0000L
     ; sel= 56
     ; galpha= 0.
     ; gftm= (1., 0., 0., 0., 1., 0.)
@@ -38,57 +38,43 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
       let ed = (nd *. ba) +. (ne *. bd) in
       let ee = (nd *. bb) +. (ne *. be) in
       let ef = (nd *. bc) +. (ne *. bf) +. nf in
-      let eq_zero x = (Float.compare 0. x) = 0 in
-      let res = 
+      let eq_zero x = Float.compare 0. x = 0 in
+      let res =
         let ea, eb, ec =
-          if eq_zero ea && eq_zero eb && eq_zero ec then
-            (1., 0., 0.)
-          else
-            (ea, eb, ec)
+          if eq_zero ea && eq_zero eb && eq_zero ec then (1., 0., 0.)
+          else (ea, eb, ec)
         in
         let ed, ee, ef =
-          if eq_zero ed && eq_zero ee && eq_zero ef then
-            (0., 1., 0.)
-          else
-            (ed, ee, ef)
+          if eq_zero ed && eq_zero ee && eq_zero ef then (0., 1., 0.)
+          else (ed, ee, ef)
         in
         (ea, eb, ec, ed, ee, ef)
       in
-        res
+      res
     in
     let apply_gradient pattern low4 nstops spread ngm =
       let ea, eb, ec, ed, ee, ef = egm ngm state.gbtm in
-      let spread_ty = 
-        if spread = 0x00 then
-              Pattern.NONE
-            else if spread = 0x01 then
-              Pattern.PAD
-            else if spread = 0x02 then
-              Pattern.REFLECT
-            else
-              Pattern.REPEAT
+      let spread_ty =
+        if spread = 0x00 then Pattern.NONE
+        else if spread = 0x01 then Pattern.PAD
+        else if spread = 0x02 then Pattern.REFLECT
+        else Pattern.REPEAT
       in
       save ctx ;
-      Pattern.set_matrix pattern {
-        xx = ea ;
-        xy = eb ;
-        x0 = ec ;
-        yx = ed ;
-        yy = ee ;
-        y0 = ef
-      };
-      Pattern.set_extend pattern spread_ty;
+      Pattern.set_matrix pattern
+        {xx= ea; xy= eb; x0= ec; yx= ed; yy= ee; y0= ef} ;
+      Pattern.set_extend pattern spread_ty ;
       for i = 0 to nstops - 1 do
-              let stop = state.regs.((state.sel + low4 + i) mod 64) in
-              let ofs =
-                Int64.to_float (Int64.logand stop 0xFFFF_FFFFL) /. 65536.
-              in
-              let r, g, b, a = Color.postmul_rgba stop in
-              Pattern.add_color_stop_rgba pattern ~ofs r g b a
-            done ;
-            set_source ctx pattern ;
-            fill ctx ;
-            restore ctx
+        let stop = state.regs.((state.sel + low4 + i) mod 64) in
+        let ofs =
+          Int64.to_float (Int64.logand stop 0xFFFF_FFFFL) /. 65536.
+        in
+        let r, g, b, a = Color.postmul_rgba stop in
+        Pattern.add_color_stop_rgba pattern ~ofs r g b a
+      done ;
+      set_source ctx pattern ;
+      fill ctx ;
+      restore ctx
     in
     let idx i = i mod 64 in
     try
@@ -180,10 +166,32 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
     with Encdec.Decoder.OutOfOps -> ()
 
   (* TODO move this out of this module *)
-  let setup_cairo _vm =
-    let surface = Image.create Image.ARGB32 ~w:256 ~h:256 in
+  let setup_cairo vm =
+    let width = 500 in
+    let height = 500 in
+    let fwidth = float_of_int width in
+    let fheight = float_of_int height in
+    let metadata = fst (vm.metadata) in
+    let msd =
+      if (List.length metadata) = 0 then
+        (-32., -32., 32., 32.)
+      else
+        match (List.hd metadata).msd with
+        | ViewBox (a,b,c,d) -> (a,b,c,d)
+        | _ -> (-32., -32., 32., 32.)
+    in
+    let (minx, miny, maxx, maxy) = msd in
+    let vw = maxx -. minx in
+    let vh = maxy -. miny in
+    let scale_x = fwidth /. vw in
+    let scale_y = fheight /. vh in
+    let dx = -. (minx *. scale_x) in
+    let dy = -. (miny *. scale_y) in
+    let surface = Image.create Image.ARGB32 ~w:width ~h:height in
     let ctx = create surface in
-    translate ctx 128. 128. ; scale ctx 2. 2. ; (surface, ctx)
+    translate ctx dx dy;
+    scale ctx scale_x scale_y ;
+    (surface, ctx)
 
   let run vm =
     let surface, ctx = setup_cairo vm in

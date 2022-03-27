@@ -118,6 +118,7 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
       match msd with
       | ViewBox (c1, c2, c3, c4) ->
           print_quadruple raw_stream (c1, c2, c3, c4)
+      | _ -> ()
     in
     let print_chunk chunk =
       let mid_string =

@@ -47,7 +47,7 @@ module Decoder = struct
       let type_spec = b land 0x3 in
       if type_spec = 0 then 4 else if type_spec = 2 then 2 else 1
 
-    let _decode_float hdl =
+    let decode_float hdl =
       let n0 = Input.read_byte hdl in
       let n1 = Input.read_byte hdl in
       let n2 = Input.read_byte hdl in
@@ -99,11 +99,25 @@ module Decoder = struct
       let c4, _, rb4 = decode_coord hdl in
       (ViewBox (c1, c2, c3, c4), rb1 @ rb2 @ rb3 @ rb4)
 
+    let decode_suggested_palette hdl =
+      let palcount = Input.read_byte hdl in
+      let raw_bytes = ref [] in
+      let colors = ref [] in
+      for _i = 0 to palcount do
+        let color_buf = read_four_bytes hdl in
+        let color = Int64.of_int32 (Bytes.get_int32_le color_buf 0) in
+        raw_bytes := (int_list_of_bytes color_buf) :: !raw_bytes;
+        colors := color :: !colors
+      done ;
+      (SuggestedPalette !colors, [palcount] :: !raw_bytes)
+
     let decode_metadata_chunk hdl =
       let chunk_length, _, raw_chunk_length = decode_nat hdl in
       let mid, _, raw_mid = decode_nat hdl in
       let msd, raw_msd =
-        if mid = 8 then decode_viewbox hdl else failwith "not implemented"
+        if mid = 8 then decode_viewbox hdl
+        else if mid = 16 then decode_suggested_palette hdl
+        else failwith "unimplemented"
       in
       ({length= chunk_length; mid; msd}, raw_chunk_length @ raw_mid @ raw_msd)
 
@@ -124,7 +138,7 @@ module Decoder = struct
       let c2, _, r2 = decode_coord hdl in
       ((c1, c2), r1 @ r2)
 
-    let decode_triple hdl =
+    let _decode_triple hdl =
       let c1, _, r1 = decode_coord hdl in
       let c2, _, r2 = decode_coord hdl in
       let c3, _, r3 = decode_coord hdl in
@@ -299,16 +313,25 @@ module Decoder = struct
           let gradient_config = Input.read_byte hdl in
           let nstops = (gradient_config land 0x3F) + 2 in
           let spread = gradient_config lsr 6 in
-          let coords, raw_bytes = decode_triple hdl in
-          ( FillLinearGradient (low4, nstops, spread, coords)
-          , [opcode; gradient_config] :: raw_bytes )
+          let c1, rc1 = decode_float hdl in
+          let c2, rc2 = decode_float hdl in
+          let c3, rc3 = decode_float hdl in
+          ( FillLinearGradient (low4, nstops, spread, (c1, c2, c3))
+          , ([opcode; gradient_config] :: rc1) @ rc2 @ rc3 )
         else if opcode >= 0xA0 && opcode <= 0xAF then
           let gradient_config = Input.read_byte hdl in
           let nstops = (gradient_config land 0x3F) + 2 in
           let spread = gradient_config lsr 6 in
-          let coords, raw_bytes = decode_sextuple hdl in
-          ( FillRadialGradient (low4, nstops, spread, coords)
-          , [opcode; gradient_config] :: raw_bytes )
+          let c1, rc1 = decode_float hdl in
+          let c2, rc2 = decode_float hdl in
+          let c3, rc3 = decode_float hdl in
+          let c4, rc4 = decode_float hdl in
+          let c5, rc5 = decode_float hdl in
+          let c6, rc6 = decode_float hdl in
+          ( FillRadialGradient
+              (low4, nstops, spread, (c1, c2, c3, c4, c5, c6))
+          , ([opcode; gradient_config] :: rc1) @ rc2 @ rc3 @ rc4 @ rc5 @ rc6
+          )
         else raise (OpNotImplemented opcode)
       in
       (instr, raw_bytes)

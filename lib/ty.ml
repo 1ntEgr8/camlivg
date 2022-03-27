@@ -18,36 +18,29 @@ type instruction =
   | CubeTo of sextuple list
   | ClosePathMoveTo of tuple
   | Parallelogram of quadruple
-  (* Ellipse (num_quarters, quad) *)
-  | Ellipse of int * quadruple
+  | Ellipse of int * quadruple (* num_quarters, quad *)
   | SelPlus of int
   | Jump of int
   | FDJump of int * int
-  | LODJump of int * float * float
-  (* CallTransformed (alpha_value, affine_matrix, segref) *)
-  | CallTransformed of int * sextuple * segref
+  | LODJump of int * float * float (* jump_count, lod0, lod1 *)
+  | CallTransformed of int * sextuple * segref (* alpha_value, affine_matrix, segref *)
   | CallUntransformed of segref
   | Return
-  (* SetRegLow (low4, data) *)
-  | SetRegLow of int * int32
-  (* SetRegHigh (low4, data) *)
-  | SetRegHigh of int * int32
-  (* SetReg (low4, data) *)
-  | SetReg of int * int64
-  (* SelSetRegs (low4, data) *)
-  | SelSetRegs of int * raw_decoded_bytes
-  (* FillFlat (low4) *)
-  | FillFlat of int
-  (* FillLinearGradient (low4, nstops, spread, coords) *)
-  | FillLinearGradient of int * int * int * triple
-  (* FillRadialGradient (low4, nstops, spread, coords) *)
-  | FillRadialGradient of int * int * int * sextuple
+  | SetRegLow of int * int32 (* low4, data *)
+  | SetRegHigh of int * int32 (* low4, data *)
+  | SetReg of int * int64 (* low4, data *)
+  | SelSetRegs of int * raw_decoded_bytes (* low4, data *)
+  | FillFlat of int (* low4 *)
+  | FillLinearGradient of int * int * int * triple (* low4, nstops, spread, ngm *)
+  | FillRadialGradient of int * int * int * sextuple (* low4, nstops, spread, ngm *)
   | Reserved0 of extra_data
   | Reserved1 of extra_data
   | Reserved2 of extra_data * tuple
   | Reserved3 of extra_data
   | Nop
 
-type msd = ViewBox of float * float * float * float
+type msd =
+  | ViewBox of float * float * float * float
+  | SuggestedPalette of int64 list (* rgba colors *)
 
 type metadata_chunk = {length: int; mid: int; msd: msd}
