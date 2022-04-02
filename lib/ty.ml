@@ -41,6 +41,8 @@ type instruction =
 
 type msd =
   | ViewBox of float * float * float * float
-  | SuggestedPalette of int64 list (* rgba colors *)
+  | SuggestedPalette of int array
+
+(* rgba colors *)
 
 type metadata_chunk = {length: int; mid: int; msd: msd}

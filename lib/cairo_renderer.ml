@@ -1,5 +1,6 @@
 open Vm
 open Cairo
+open Color
 
 module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
   type t = Vm.t
@@ -27,6 +28,18 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
 
   let run_instructions vm ctx =
     let state = init_machine () in
+    let idx i = i mod 64 in
+    let copy_suggested_palette () =
+      match vm.suggested_palette with
+      | None -> ()
+      | Some palette ->
+          let palcount = Array.length palette in
+          for i = 0 to palcount - 1 do
+            let data = palette.(i) in
+            state.regs.(i) <- Int64.shift_left (Int64.of_int data) 32
+          done
+      (* Rest of the registers are initialized to opaque black *)
+    in
     let gftm (x, y) =
       let fa, fb, fc, fd, fe, ff = state.gftm in
       ((fa *. x) +. (fb *. y) +. fc, (fd *. x) +. (fe *. y) +. ff)
@@ -52,6 +65,31 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
       in
       res
     in
+    let colref cref =
+      if cref >= 0x00 && cref <= 0x7F then
+        rgba_of_int built_in_palette.(cref)
+      else if cref >= 0x80 && cref <= 0xBF then
+        match vm.suggested_palette with
+        | Some p ->
+            let cref_idx = idx cref in
+            if cref_idx >= Array.length p then opaque_black
+            else rgba_of_int p.(cref_idx)
+        | None -> opaque_black
+      else
+        let reg_val = state.regs.(idx cref) in
+        rgba_of_int64 reg_val
+    in
+    let color i =
+      let n = state.regs.(i) in
+      let col = rgba_of_int64 n in
+      if rgba_is_sensible col then postmul_rgba col
+      else
+        let weight, colref0, colref1 = lin_blend_of_int64 n in
+        let color0 = colref colref0 in
+        let color1 = colref colref1 in
+        let result = blend color0 color1 weight in
+        postmul_rgba result
+    in
     let apply_gradient pattern low4 nstops spread ngm =
       let ea, eb, ec, ed, ee, ef = egm ngm state.gbtm in
       let spread_ty =
@@ -65,19 +103,20 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
         {xx= ea; xy= eb; x0= ec; yx= ed; yy= ee; y0= ef} ;
       Pattern.set_extend pattern spread_ty ;
       for i = 0 to nstops - 1 do
-        let stop = state.regs.((state.sel + low4 + i) mod 64) in
+        let color_idx = idx (state.sel + low4 + i) in
+        let reg_val = state.regs.(color_idx) in
         let ofs =
-          Int64.to_float (Int64.logand stop 0xFFFF_FFFFL) /. 65536.
+          Int64.to_float (Int64.logand reg_val 0xFFFF_FFFFL) /. 65536.
         in
-        let r, g, b, a = Color.postmul_rgba stop in
+        let r, g, b, a = color color_idx in
         Pattern.add_color_stop_rgba pattern ~ofs r g b a
       done ;
       set_source ctx pattern ;
       fill ctx ;
       restore ctx
     in
-    let idx i = i mod 64 in
     try
+      copy_suggested_palette () ;
       while true do
         let instruction, _ = Vm.next_instruction vm.pc in
         match instruction with
@@ -143,9 +182,7 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
               state.regs.(idx (state.sel + i)) <- Bytes.get_int64_le buf 0
             done
         | FillFlat low4 ->
-            let r, g, b, a =
-              Color.postmul_rgba state.regs.(idx (state.sel + low4))
-            in
+            let r, g, b, a = color (idx (state.sel + low4)) in
             save ctx ;
             set_source_rgba ctx r g b a ;
             fill ctx ;
@@ -171,27 +208,25 @@ module Make (Vm : V) : Interpreter.I with type t = Vm.t = struct
     let height = 500 in
     let fwidth = float_of_int width in
     let fheight = float_of_int height in
-    let metadata = fst (vm.metadata) in
+    let metadata = fst vm.metadata in
     let msd =
-      if (List.length metadata) = 0 then
-        (-32., -32., 32., 32.)
+      if List.length metadata = 0 then (-32., -32., 32., 32.)
       else
+        (* TODO iterate through list to find viewbox msd *)
         match (List.hd metadata).msd with
-        | ViewBox (a,b,c,d) -> (a,b,c,d)
+        | ViewBox (a, b, c, d) -> (a, b, c, d)
         | _ -> (-32., -32., 32., 32.)
     in
-    let (minx, miny, maxx, maxy) = msd in
+    let minx, miny, maxx, maxy = msd in
     let vw = maxx -. minx in
     let vh = maxy -. miny in
     let scale_x = fwidth /. vw in
     let scale_y = fheight /. vh in
-    let dx = -. (minx *. scale_x) in
-    let dy = -. (miny *. scale_y) in
+    let dx = -.(minx *. scale_x) in
+    let dy = -.(miny *. scale_y) in
     let surface = Image.create Image.ARGB32 ~w:width ~h:height in
     let ctx = create surface in
-    translate ctx dx dy;
-    scale ctx scale_x scale_y ;
-    (surface, ctx)
+    translate ctx dx dy ; scale ctx scale_x scale_y ; (surface, ctx)
 
   let run vm =
     let surface, ctx = setup_cairo vm in

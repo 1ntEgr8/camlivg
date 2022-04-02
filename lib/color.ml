@@ -1,4 +1,4 @@
-let built_in =
+let built_in_palette =
   [| 0x00000000
    ; 0x80808080
    ; 0xC0C0C0C0
@@ -128,25 +128,39 @@ let built_in =
    ; 0xFFFFFFC0
    ; 0xFFFFFFFF |]
 
-let rgba n =
-  let srl = Fun.flip Int64.shift_right_logical in
-  let r =
-    Int64.logand n 0x0000_00FF_0000_0000L |> srl 32 |> Int64.to_float
-  in
-  let g =
-    Int64.logand n 0x0000_FF00_0000_0000L |> srl 40 |> Int64.to_float
-  in
-  let b =
-    Int64.logand n 0x00FF_0000_0000_0000L |> srl 48 |> Int64.to_float
-  in
-  let a =
-    Int64.logand n 0xFF00_0000_0000_0000L |> srl 56 |> Int64.to_float
-  in
+let rgba_of_int n =
+  let r = n land 0x000000FF |> float_of_int in
+  let g = (n land 0x0000FF00) lsr 8 |> float_of_int in
+  let b = (n land 0x00FF0000) lsr 16 |> float_of_int in
+  let a = (n land 0xFF000000) lsr 24 |> float_of_int in
   (r, g, b, a)
 
-let postmul_rgba n =
-  let r, g, b, a = rgba n in
+let rgba_of_int64 n =
+  let n = Int64.to_int (Int64.shift_right_logical n 32) in
+  rgba_of_int n
+
+let lin_blend_of_int64 n =
+  let blend, colref0, colref1, _ = rgba_of_int64 n in
+  (blend, int_of_float colref0, int_of_float colref1)
+
+let rgba_is_sensible (r, g, b, a) =
+  let comp_r = Float.compare r a in
+  let comp_g = Float.compare g a in
+  let comp_b = Float.compare b a in
+  comp_r <= 0 && comp_g <= 0 && comp_b <= 0
+
+let postmul_rgba (r, g, b, a) =
   if Float.equal a 0. then (0., 0., 0., 0.)
   else (r /. a, g /. a, b /. a, a /. 255.)
 
+let blend (r0, g0, b0, a0) (r1, g1, b1, a1) weight =
+  let weight0 = 255. -. weight in
+  let weight1 = weight in
+  let res chan0 chan1 =
+    Float.floor (((weight0 *. chan0) +. (weight1 *. chan1) +. 128.) /. 255.)
+  in
+  (res r0 r1, res g0 g1, res b0 b1, res a0 a1)
+
 let transparent_black = (0., 0., 0., 0.)
+
+let opaque_black = (0., 0., 0., 1.)

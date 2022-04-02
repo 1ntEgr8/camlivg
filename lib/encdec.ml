@@ -102,14 +102,14 @@ module Decoder = struct
     let decode_suggested_palette hdl =
       let palcount = Input.read_byte hdl in
       let raw_bytes = ref [] in
-      let colors = ref [] in
-      for _i = 0 to palcount do
+      let colors = Array.make (palcount + 1) 0 in
+      for i = 0 to palcount do
         let color_buf = read_four_bytes hdl in
-        let color = Int64.of_int32 (Bytes.get_int32_le color_buf 0) in
-        raw_bytes := (int_list_of_bytes color_buf) :: !raw_bytes;
-        colors := color :: !colors
+        let color = Int32.to_int (Bytes.get_int32_le color_buf 0) in
+        raw_bytes := int_list_of_bytes color_buf :: !raw_bytes ;
+        colors.(i) <- color
       done ;
-      (SuggestedPalette !colors, [palcount] :: !raw_bytes)
+      (SuggestedPalette colors, [palcount] :: !raw_bytes)
 
     let decode_metadata_chunk hdl =
       let chunk_length, _, raw_chunk_length = decode_nat hdl in
